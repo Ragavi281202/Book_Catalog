@@ -1,7 +1,8 @@
 from django.db import models
+from django.contrib.auth.models import User
 
-class BookProject(models.Model):
-    book_id = models.CharField(max_length=15, unique=True, blank=True, null=True)
+class BookCatalog(models.Model):
+    book_id = models.CharField(unique=True, max_length=15, blank=True, null=True)
     cover_image_url = models.CharField(max_length=200, blank=True, null=True)
     book_title = models.CharField(max_length=300, blank=True, null=True)
     book_details = models.TextField(blank=True, null=True)
@@ -14,15 +15,18 @@ class BookProject(models.Model):
     num_reviews = models.IntegerField(blank=True, null=True)
     average_rating = models.FloatField(blank=True, null=True)
     rating_distribution = models.CharField(max_length=300, blank=True, null=True)
+    image_url = models.CharField(max_length=200, blank=True, null=True)
 
     class Meta:
-        db_table = 'book_project'
-        managed = False
-
-class BookImages(models.Model):
-    book = models.ForeignKey(BookProject, on_delete=models.CASCADE, db_column='book_project_id', blank=True, null=True)
-    images_url = models.CharField(max_length=200, blank=True, null=True)
-
-    class Meta:
-        db_table = 'book_images'
+        db_table = 'book_catalog'
         managed = True
+        
+class Review(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    book = models.ForeignKey(BookCatalog, on_delete=models.CASCADE)
+    content = models.TextField()
+
+class Rating(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    book = models.ForeignKey(BookCatalog, on_delete=models.CASCADE)
+    score = models.PositiveIntegerField()

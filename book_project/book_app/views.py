@@ -1,6 +1,5 @@
-from django.shortcuts import render
+from django.shortcuts import render,get_object_or_404, redirect
 import requests
-import logging
 from django.http import HttpResponse, JsonResponse
 import matplotlib.pyplot as plt
 import matplotlib
@@ -9,6 +8,14 @@ import io
 import base64
 import json
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from log_module import setup_logging
+from django.shortcuts import render, redirect
+from django.contrib.auth import login as auth_login, authenticate, logout 
+from .forms import RegisterForm,LoginForm
+from django.contrib.auth.decorators import login_required
+from .models import BookCatalog,Review,Rating
+
+logger = setup_logging()
 
 # main_url = "http://fastapi:8001"
 main_url = "http://127.0.0.1:8001"
@@ -22,13 +29,14 @@ def count_books(request):
     url6 = f"{main_url}/ratings_count"
 
     try:
+        logger.info("Starting API request")
         response1 = requests.get(url1)
         response2 = requests.get(url2)
         response3 = requests.get(url3)
         response4 = requests.get(url4)
         response5 = requests.get(url5)
         response6 = requests.get(url6)
-        logging.info(f"Response Status Codes: {response1.status_code}, {response2.status_code}, {response3.status_code}, {response4.status_code}, {response5.status_code}, {response6.status_code}")
+        logger.info("API request successful")
 
         if response1.status_code == 200 and response2.status_code == 200 and response3.status_code == 200 and response4.status_code == 200 and response5.status_code == 200 and response6.status_code == 200:
             data1 = response1.json()
@@ -77,10 +85,12 @@ def count_books(request):
             }
             return render(request, "dashboard.html", content)
         else:
-            logging.error("Failed to retrieve some API data")
+            logger.error("Failed to retrieve some API data")
             return HttpResponse("Failed to retrieve data", status=500)
     except Exception as e:
-        logging.error(f"Error retrieving data: {e}")
+        # logger.exception(f"Error during API request: {str(e)}")
+        logger.error(f"An error occurred while fetching categories: {str(e)}", exc_info=True)
+        # logger.error("Traceback: %s", traceback.format_exc())
         return HttpResponse("An error occurred", status=500)
 
 def suggestions_search(request):
@@ -88,10 +98,12 @@ def suggestions_search(request):
     author_url = f"{main_url}/author_list"
     genres_url = f"{main_url}/genres_list"
     try:
+        logger.info("Starting API request")
         booktitle_response = requests.get(booktitle_url)
         author_response = requests.get(author_url)
         genres_response = requests.get(genres_url)
-
+        logger.info("API request successful")
+        
         book_title = booktitle_response.json()
         author_names = author_response.json()
         genres_data = genres_response.json()
@@ -106,21 +118,22 @@ def suggestions_search(request):
             "Genres": genres_title
         }
 
+        suggestions = []
         if request.method == 'POST':
             category = request.POST.get('category')
             query = request.POST.get('query', '').lower()
-            suggestions = []
             if category in categories:
                 suggestions = [item for item in categories[category] if query in item.lower()]
 
         return JsonResponse({"suggestions": suggestions})
     except Exception as e:
-        logging.error(f"Error retrieving suggestions: {e}")
+        # logger.exception(f"Error retrieving suggestions: {str(e)}")
+        logger.error(f"An error occurred while fetching categories: {str(e)}", exc_info=True)
+        # logger.error("Traceback: %s", traceback.format_exc())
         return JsonResponse({"suggestions": []})
 
-logger = logging.getLogger(__name__)
-
 def searching(request):
+    logger.info("Starting API request")
     if request.method == 'POST':
         option = request.POST.get('category')
         value = request.POST.get('query')
@@ -142,20 +155,22 @@ def searching(request):
 
         data = response.json()
         if not data:
-            data = "Invalid"
+            logger.warning("Invalid data")
+            return render(request, 'search.html', {'book_name': 'Invalid', 'option': option, 'query': value})
 
         for book in data:
             if isinstance(book.get('genres'), str):
                 book['genres'] = json.loads(book['genres'])
-        for book in data:
-            if isinstance(book.get('images'), str):
-                book['images'] = json.loads(book['images'])
+        # for book in data:
+        #     if isinstance(book.get('cover_image_url'), str):
+        #         book['images'] = json.loads(book['images'])
 
         page = request.GET.get('page', 1)
         paginator = Paginator(data, 10)
 
         if int(page) > paginator.num_pages:
             page_not_found = True
+            logger.warning("Page Not Found")
         try:
             books = paginator.page(page)
             page_not_found = False
@@ -175,10 +190,13 @@ def searching(request):
 
         return render(request, 'search.html', context_data)
     except Exception as e:
-        logger.error(f"Error during search: {e}")
+        # logger.exception(f"Error during search: {str(e)}")
+        logger.error(f"An error occurred while fetching categories: {str(e)}", exc_info=True)
+        # logger.error("Traceback: %s", traceback.format_exc())
         return render(request, 'search.html', {'book_name': [], 'option': option, 'query': value})
 
 def genere_search(request):
+    logger.info("Starting API request")
     genre_data = request.GET.get('genre')
     try:
         if genre_data:
@@ -188,6 +206,7 @@ def genere_search(request):
             data = "Error"
 
         if data == "Invalid" or data == "Error":
+            logger.warning("Invalid Data")
             context_data = {
                 'book_name': data,
                 'genre_data': genre_data
@@ -197,16 +216,16 @@ def genere_search(request):
         for book in data:
             if isinstance(book.get('genres'), str):
                 book['genres'] = json.loads(book['genres'])
-                print(book['genres'])
-        for book in data:
-            if isinstance(book.get('images'), str):
-                book['images'] = json.loads(book['images'])
+        # for book in data:
+        #     if isinstance(book.get('images'), str):
+        #         book['images'] = json.loads(book['images'])
 
         page = request.GET.get('page', 1)
         paginator = Paginator(data, 10)
 
         if int(page) > paginator.num_pages:
             page_not_found = True
+            logger.warning("Page Not Found")
         try:
             books = paginator.page(page)
             page_not_found = False
@@ -221,8 +240,67 @@ def genere_search(request):
             'page_not_found': page_not_found,
             'genre_data': genre_data
         }
-        
+        logger.info(f"Context Data: {context_data}")
         return render(request, 'search_genre.html', context_data)
     except Exception as e:
-        logging.error(f"Error during genre search: {e}")
-        return render(request, 'search_genre.html', {'book_name': 'Error', 'genre_data': genre_data})
+        # logger.exception(f"Error during genre search: {str(e)}")
+
+        logger.error(f"An error occurred while fetching categories: {str(e)}", exc_info=True)
+        # logger.error("Traceback: %s", traceback.format_exc())
+        return render(request, 'search_genre.html', {'book_name': [], 'genre_data': genre_data})
+    
+def register(request):
+    if request.method == 'POST':
+        form = RegisterForm(request.POST)
+        if form.is_valid():
+            user = form.save()
+            auth_login(request, user)
+            return redirect('count_books')
+    else:
+        form = RegisterForm()
+    return render(request, 'register.html', {'form': form})
+
+def login(request):
+    if request.method == 'POST':
+        form = LoginForm(request, data=request.POST)
+        if form.is_valid():
+            username = form.cleaned_data.get('username')
+            password = form.cleaned_data.get('password')
+            user = authenticate(request, username=username, password=password)
+            if user is not None:
+                auth_login(request, user)
+                return redirect('count_books')  
+    else:
+        form = LoginForm()
+    return render(request, 'login.html', {'form': form})
+
+def logout_user(request):
+    logout(request)
+    return redirect('count_books')
+
+@login_required
+def add_review(request, book_id):
+    book = get_object_or_404(BookCatalog, id=book_id)
+    if request.method == 'POST':
+        review_content = request.POST.get('content')
+        if review_content:
+            review = Review.objects.create(book=book, user=request.user, content=review_content)
+            return JsonResponse({'message': 'Review added successfully.'})
+        else:
+            return JsonResponse({'error': 'No content provided for review.'}, status=400)
+
+    return JsonResponse({'error': 'Invalid request method.'}, status=405)
+
+@login_required
+def add_rating(request, book_id):
+    book = get_object_or_404(BookCatalog, id=book_id)
+    if request.method == 'POST':
+        try:
+            rating_score = int(request.POST.get('content'))
+            if 1 <= rating_score <= 5:
+                rating = Rating.objects.create(book=book, user=request.user, score=rating_score)
+                return JsonResponse({"message": "Rating added successfully."})
+            else:
+                return JsonResponse({"error": "Rating must be between 1 and 5."}, status=400)
+        except ValueError:
+            return JsonResponse({"error": "Invalid rating value."}, status=400)
