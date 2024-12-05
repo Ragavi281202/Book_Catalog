@@ -4,8 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Document</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
 
 </head>
 <style>
@@ -79,39 +77,15 @@
 </style>
 <body>
     <div class="container">
-    <div class="login-form">
-        <h2>Login</h2>
-        <form method="POST">
-            {% csrf_token %}
-            {{ form.as_p }}
-            {% if form.username.errors %}
-                <script>
-                    Toastify({
-                        text: "{{ form.username.errors|join:' ' }}",
-                        duration: 3000,
-                        close: true,
-                        gravity: "top",
-                        position: "right",
-                        backgroundColor: "linear-gradient(to right, #ff5f6d, #ffc3a0)"
-                    }).showToast();
-                </script>
-            {% endif %}
-            {% if form.password.errors %}
-                <script>
-                    Toastify({
-                        text: "{{ form.password.errors|join:' ' }}",
-                        duration: 3000,
-                        close: true,
-                        gravity: "top",
-                        position: "right",
-                        backgroundColor: "linear-gradient(to right, #ff5f6d, #ffc3a0)"
-                    }).showToast();
-                </script>
-            {% endif %}
-            <button type="submit">Login</button>
-        </form>
-        <a href="{% url 'register' %}">Don't have an account? Register here</a>
+        <div class="login-form">
+            <h2>Login</h2>
+            <form method="POST">
+                {% csrf_token %}
+                {{ form.as_p }}
+                <button type="submit">Login</button>
+            </form>
+            <a href="{% url 'register' %}">Don't have an account? Register here</a>
+        </div>
     </div>
-</div>
 </body>
 </html>

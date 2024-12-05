@@ -1,5 +1,5 @@
 import uvicorn,json
-from fastapi import FastAPI,HTTPException
+from fastapi import FastAPI,HTTPException,WebSocket,WebSocketDisconnect
 import MySQLdb
 import mysql
 from mysql.connector import Error
@@ -7,8 +7,18 @@ from pydantic import BaseModel
 from fastapi.responses import JSONResponse
 from decouple import config
 from log_module import setup_logging
+from typing import List
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://127.0.0.1:8000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 logger = setup_logging()
 
@@ -89,6 +99,26 @@ def ratings_count():
     values = cursor.fetchall()
     conn.close()
     return {average_rating:count for average_rating, count in values}
+
+@app.get('/retrieve_rating')
+def retrieve_rating():
+    conn = db_connect()
+    cursor = conn.cursor()
+    query="select bc.book_id,bc.book_title,avg(b.score)as average_score from book_catalog bc left join book_app_rating b ON b.book_id = bc.book_id where b.score is not null group by bc.book_id;   ";
+    cursor.execute(query)
+    values = cursor.fetchall()
+    conn.close()
+    return [{"book_id": value[0], "book_title": value[1], "average_rating": value[2]} for value in values]
+
+@app.get('/retrieve_review')
+def retrieve_review():
+    conn = db_connect()
+    cursor = conn.cursor()
+    query="select a.username,b.content,bc.book_title,bc.book_id from auth_user a left join book_app_review b on a.id=b.user_id left join book_catalog bc ON b.book_id = bc.book_id where b.content is not null;";
+    cursor.execute(query)
+    values = cursor.fetchall()
+    conn.close()
+    return values
 
 # @app.get('/search_author/{author}')
 # async def search_author(author: str):
@@ -292,3 +322,34 @@ async def author_list():
 async def genres_list():
     data = genres()
     return data
+
+# web socket connection:
+
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: List[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+
+    def disconnect(self, websocket: WebSocket):
+        self.active_connections.remove(websocket)
+
+    async def broadcast(self, message: str):
+        for connection in self.active_connections:
+            await connection.send_text(message)
+
+
+manager = ConnectionManager()
+
+@app.websocket("/ws/notifications")
+async def websocket_endpoint(websocket: WebSocket):
+    await manager.connect(websocket)
+    try:
+        while True:
+            message = await websocket.receive_text()
+            await manager.broadcast(message)
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
+

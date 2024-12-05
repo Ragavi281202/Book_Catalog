@@ -324,6 +324,45 @@
                 cursor: pointer;
             }
 
+            .dropdown {
+                position: relative;
+                display: inline-block;
+            }
+
+            .dropdown-menu {
+                display: none;
+                position: absolute;
+                right: 0;
+                background-color: #fff;
+                min-width: 160px;
+                border: 1px solid #ddd;
+                box-shadow: 0px 8px 16px rgba(0, 0, 0, 0.2);
+                z-index: 1;
+                padding: 10px;
+                border-radius: 5px;
+            }
+
+            .username {
+                display: block;
+                font-size: 14px;
+                margin-bottom: 10px;
+            }
+
+            .logout-btn {
+                width: 100%;
+                padding: 8px;
+                background-color: #053657;  
+                border: none;
+                color: white;
+                font-size: 14px;
+                border-radius: 5px;
+                cursor: pointer;
+            }
+
+            .logout-btn:hover {
+                background-color: #034f62;
+            }
+
         </style>
     </head>
 
@@ -333,6 +372,7 @@
                 <h1>DASHBOARD</h1>
                 <div class="search-container">
                     <div class="search-bar">
+
                         <form method="post" action="{% url 'searching' %}">
                             {% csrf_token %}
                             <select class="search-dropdown" id="category" name="category">
@@ -346,23 +386,29 @@
                             <button class="search-button" type="submit" formaction="/searching/" disabled id="button_id"><i
                                     class="fa fa-search"></i></button>
                         </form>
+
                         <div class="autocomplete-suggestions" id="autocomplete-results" style="display: none;"></div>
                     </div>
                 </div>
                 <div class="auth-buttons">
                 {% if user.is_authenticated %}
-                    <!-- If user is logged in, show the Logout button -->
-                    <a href="{% url 'logout' %}">
-                        <button class="auth-button">Logout</button>
-                    </a>
+                    <div class="dropdown">
+                        <i class="far fa-user-circle user-icon" onclick="toggleDropdown()" style="font-size: 40px; cursor: pointer;"></i>
+                        <div id="dropdown-menu" class="dropdown-menu">
+                            <span class="username">{{user.username}}</span>
+                            <a href="{% url 'logout' %}"><button class="logout-btn">Logout</button></a>
+                            
+                        </div>
+                    </div>
+
                 {% else %}
-                    <!-- If user is not logged in, show the Login and Register buttons -->
                     <a href="{% url 'login' %}">
                         <button class="auth-button">Login</button>
                     </a>
                     <a href="{% url 'register' %}">
                         <button class="auth-button">Register</button>
                     </a>
+
                 {% endif %}
             </div>
             </div>
@@ -376,43 +422,48 @@
                         </div>
                     </div>
                 </div>
+
                 <div class="card">
                     <div class="cdtxt">
                         <h3 class="cdtit">Authors Count</h3>
                         <div class="cd_data">
                             <i class="fa-solid fa-pen-to-square" id="icon"></i>
-                            <h4 class="cddt">{{count_author}}</h4>
+                            <h4 class="cddt" id="count-author">{{count_author}}</h4>
                         </div>
                     </div>
                 </div>
+
                 <div class="card">
                     <div class="cdtxt">
                         <h3 class="cdtit">Top Rated Books</h3>
                         <div class="cd_data">
                             <i class="fa-solid fa-star" id="icon"></i>
-                            <h4 class="cddt">{{five_count}}</h4>
+                            <h4 class="cddt" id="five-count">{{five_count}}</h4>
                         </div>
                     </div>
                 </div>
+
             </div>
             <div class="cards">
                 {% for book in five_images %}
                 <div class="card1">
                     <!-- <img src="https://result1-data.s3.us-west-2.amazonaws.com/downloaded_files/{{ book.image }}" alt="image" class="cdimg1"> -->
-                    <img src="{{ book.image }}" alt="image" class="cdimg1">
+                    <img src="{{ book.image }}" alt="image" class="cdimg1" id="cdimage{{ forloop.counter }}">
                     <div class="cdtxt1">
-                        <h2 class="cdtit1">Book name: {{ book.name }}</h2>
-                        <h2 class="cdtit1">Author name: {{ book.author }}</h2>
+                        <h2 class="cdtit1" id="cdtitle1">Book name: {{ book.name }}</h2>
+                        <h2 class="cdtit1" id="cdtitle2">Author name: {{ book.author }}</h2>
                     </div>
                 </div>
+
                 {% endfor %}
             </div>
             <div class="cards">
                 <div class="card2">
-                    <img src="data:image/png;base64,{{ chart1 }}" alt="Top 5 Authors pie chart" width="500px">
+                    <img src="data:image/png;base64,{{ chart1 }}" alt="Top 5 Authors pie chart" width="500px" id="top-authors-chart">
                 </div>
+                
                 <div class="card2">
-                    <img src="data:image/png;base64,{{ chart2 }}" alt="Ratings Distribution Count bar chart" width="500px">
+                    <img src="data:image/png;base64,{{ chart2 }}" alt="Ratings Distribution Count bar chart" width="500px" id="ratings-chart">
                 </div>
             </div>
         </div>
@@ -437,6 +488,7 @@
                 });
 
                 categorySelect.addEventListener('change', function () {
+                    let currentFetchController=null;
                     queryInput.value = '';
                     autocompleteResults.innerHTML = '';
                     searchdata.disabled = true;
@@ -473,6 +525,7 @@
                             autocompleteResults.style.display = 'block';
                         });
                 }
+
                 document.addEventListener('click', function (event) {
                     if (!autocompleteResults.contains(event.target) && !queryInput.contains(event.target)) {
                         autocompleteResults.style.display = 'none';
@@ -480,26 +533,64 @@
                 });
 
                 const bookSocket = new WebSocket('ws://' + window.location.host + '/ws/book_notification/');
-                console.log("WebSocket connection established");
+                console.log("WebSocket connection established for live notifications");
                 bookSocket.onmessage = function (e) {
-                    const data = JSON.parse(e.data);
-                    const action = data.action;
-                    const bookTitle = data.book_title;
-                    const bookId = data.book_id;
-                    const message = data.message;
-                    console.log("message", message);
+                    try{
+                        const data = JSON.parse(e.data);
+                        const action = data.action;
+                        const bookTitle = data.book_title;
+                        const bookId = data.book_id;
+                        const message = data.message;
+                        console.log("message", message);
+                        
 
-                    if (action === 'added') {
-                        displayNotification('A new book has been added: ' + bookTitle, action);
+                        if (action === 'added') {
+                            displayNotification('A new book has been added: ' + bookTitle, action);
+                        }
+                        else if(action === 'updated')
+                        {
+                            displayNotification('A book has been updated: '+bookTitle,action)
+                        }
+                        else if (action === 'deleted') {
+                            displayNotification('A book has been deleted: ' + bookTitle,action);
+                        }
                     }
-                    else if(action === 'updated')
+                    catch (error)
                     {
-                        displayNotification('A book has been updated: '+bookTitle,action)
-                    }
-                    else if (action === 'deleted') {
-                        displayNotification('A book has been deleted: ' + bookTitle,action);
+                        console.error("Error processing WebSocket message:", error);
                     }
                 };
+
+                function fetchUpdatedData() {
+                    fetch('http://127.0.0.1:8000/count_books_updated')
+                        .then(response =>
+                        {
+                            console.log(response);
+                            return response.json()
+                        })
+                        .then(content => {
+                            console.log(content);
+
+                            document.getElementById('book-count').textContent = content.count;
+                            document.getElementById('count-author').textContent = content.count_author;
+                            document.getElementById('five-count').textContent = content.five_count;
+
+                            content.five_images.forEach((book, index) => {
+                                
+                                const bookCard = document.querySelector(`#cdimage${index + 1}`);
+                                if (bookCard) {
+                                    bookCard.src = book.image;
+                                    bookCard.alt = `Image of ${book.name}`;
+                                    bookCard.nextElementSibling.querySelector('#cdtitle1').textContent = `Book name: ${book.name}`;
+                                    bookCard.nextElementSibling.querySelector('#cdtitle2').textContent = `Author name: ${book.author}`;
+                                }
+                            });
+
+                            document.getElementById('top-authors-chart').src = 'data:image/png;base64,' + content.chart1;
+                            document.getElementById('ratings-chart').src = 'data:image/png;base64,' + content.chart2;
+                        })
+                        .catch(error => console.error('Error fetching updated data:', error));
+                }
 
                 bookSocket.onclose = function (e) {
                     console.error('WebSocket closed unexpectedly');
@@ -519,11 +610,22 @@
                     backgroundColor: action === "added" ? "#4caf50" : action === "updated" ? "blue" : "#f44336", 
                     stopOnFocus: true 
                 }).showToast();
-                window.location.reload();
-
+                fetchUpdatedData();
                 }
 
             });
 
+            function toggleDropdown() {
+                var dropdownMenu = document.getElementById('dropdown-menu');
+                dropdownMenu.style.display = (dropdownMenu.style.display === 'block') ? 'none' : 'block';
+            }
+        
+            document.addEventListener('click', function(event) {
+                var dropdownMenu = document.getElementById('dropdown-menu');
+                var userIcon = document.querySelector('.user-icon');
+                if (!userIcon.contains(event.target) && !dropdownMenu.contains(event.target)) {
+                    dropdownMenu.style.display = 'none';
+                }
+            });
         </script>
     </html>

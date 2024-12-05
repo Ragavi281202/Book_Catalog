@@ -23,10 +23,10 @@ class BookCatalog(models.Model):
         
 class Review(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    book = models.ForeignKey(BookCatalog, on_delete=models.CASCADE)
+    book = models.ForeignKey('BookCatalog', models.DO_NOTHING, to_field='book_id', blank=True, null=True)
     content = models.TextField()
 
 class Rating(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
-    book = models.ForeignKey(BookCatalog, on_delete=models.CASCADE)
+    book = models.ForeignKey('BookCatalog', models.DO_NOTHING, to_field='book_id', blank=True, null=True)
     score = models.PositiveIntegerField()
