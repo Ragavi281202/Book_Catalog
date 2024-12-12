@@ -1,0 +1,5 @@
+__pycache__
+book_app/__pycache__
+book_app/migrations/__pycache__
+book_project/__pycache__
+.env
